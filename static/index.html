@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CVE Dashboard</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        background-color: #f8f9fa;
+      }
+      .table-container {
+        margin-top: 30px;
+      }
+      .pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .details-container {
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header class="my-4">
+        <h1 class="text-center">CVE Vulnerability Dashboard</h1>
+      </header>
+
+      <!-- Filter Section -->
+      <section>
+        <div class="row mb-4">
+          <div class="col-md-4">
+            <label for="cve-id-filter" class="form-label">CVE ID</label>
+            <input
+              type="text"
+              id="cve-id-filter"
+              class="form-control"
+              placeholder="Filter by CVE ID"
+            />
+          </div>
+          <div class="col-md-4">
+            <label for="year-filter" class="form-label">Year</label>
+            <input
+              type="number"
+              id="year-filter"
+              class="form-control"
+              placeholder="Filter by Year"
+            />
+          </div>
+          <div class="col-md-4">
+            <label for="score-filter" class="form-label">Score</label>
+            <input
+              type="number"
+              id="score-filter"
+              class="form-control"
+              placeholder="Filter by Score"
+              step="0.1"
+            />
+          </div>
+        </div>
+        <div class="row mb-4">
+          <div class="col-md-4">
+            <label for="days-filter" class="form-label">Days Modified</label>
+            <input
+              type="number"
+              id="days-filter"
+              class="form-control"
+              placeholder="Modified in last N days"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- CVE List Section -->
+      <section class="table-container">
+        <h3>All CVE Records</h3>
+        <div class="pagination-container">
+          <span>Total Records: <span id="total-records">0</span></span>
+          <select id="results-per-page" class="form-select w-auto">
+            <option value="10">10</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+        <table class="table table-bordered table-hover mt-3">
+          <thead class="table-light">
+            <tr>
+              <th scope="col">CVE ID</th>
+              <th scope="col">Published</th>
+              <th scope="col">Last Modified</th>
+              <th scope="col">Identifier</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody id="cve-table-body">
+            <tr>
+              <td colspan="5" class="text-center">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="d-flex justify-content-between">
+          <button id="prev-page" class="btn btn-outline-primary" disabled>
+            Previous
+          </button>
+          <button id="next-page" class="btn btn-outline-primary" disabled>
+            Next
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <!-- Modal for CVE Details -->
+    <div
+      class="modal fade"
+      id="cveModal"
+      tabindex="-1"
+      aria-labelledby="cveModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="cveModalLabel">CVE Details</h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <p><strong>CVE ID:</strong> <span id="modal-cve-id"></span></p>
+            <p>
+              <strong>Published:</strong> <span id="modal-published"></span>
+            </p>
+            <p>
+              <strong>Last Modified:</strong>
+              <span id="modal-last-modified"></span>
+            </p>
+            <p>
+              <strong>Identifier:</strong> <span id="modal-identifier"></span>
+            </p>
+            <p><strong>Status:</strong> <span id="modal-status"></span></p>
+            <p>
+              <strong>Description:</strong> <span id="modal-description"></span>
+            </p>
+            <p><strong>V2 CVSS Score:</strong> <span id="modal-cvss"></span></p>
+            <p>
+              <strong>V2 CVSS Severity:</strong>
+              <span id="modal-vulnerability-type"></span>
+            </p>
+            <p>
+              <strong>V2 CVSS Vector:</strong> <span id="modal-impact"></span>
+            </p>
+            <p>
+              <strong>V3 CVSS Score:</strong>
+              <span id="modal-references"></span>
+            </p>
+            <p>
+              <strong>V2 CVSS Severity:</strong>
+              <span id="modal-severity"></span>
+            </p>
+            <p>
+              <strong>V2 CVSS Vector:</strong>
+              <span id="modal-affected-software"></span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      let currentPage = 0;
+      let resultsPerPage = 10; // Default results per page
+      const totalRecordsEl = document.getElementById("total-records");
+      const cveTableBody = document.getElementById("cve-table-body");
+      const prevPageBtn = document.getElementById("prev-page");
+      const nextPageBtn = document.getElementById("next-page");
+
+      // Fetch CVE data based on filters and pagination
+      async function fetchData() {
+        const cveIdFilter = document.getElementById("cve-id-filter").value;
+        const yearFilter = document.getElementById("year-filter").value;
+        const scoreFilter = document.getElementById("score-filter").value;
+        const daysFilter = document.getElementById("days-filter").value;
+
+        try {
+          const response = await fetch(
+            `http://localhost:5000/cves/list?limit=${resultsPerPage}&offset=${
+              currentPage * resultsPerPage
+            }&cve_id=${cveIdFilter}&year=${yearFilter}&score=${scoreFilter}&days=${daysFilter}`
+          );
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          const data = await response.json();
+          populateTable(data.data);
+          totalRecordsEl.textContent = data.total;
+          updatePaginationButtons(currentPage, data.total, resultsPerPage);
+        } catch (error) {
+          console.error("Error fetching data:", error);
+          cveTableBody.innerHTML = `<tr><td colspan="5" class="text-danger text-center">Failed to load data</td></tr>`;
+        }
+      }
+
+      // Populate table with CVE data
+      function populateTable(cves) {
+        cveTableBody.innerHTML = "";
+        cves.forEach((cve) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+              <td><a href="#" data-bs-toggle="modal" data-bs-target="#cveModal" onclick="showCveDetails('${
+                cve.cve_id
+              }')">${cve.cve_id}</a></td>
+              <td>${cve.published}</td>
+              <td>${cve.last_modified}</td>
+              <td>${cve.source_identifier || "N/A"}</td>
+              <td>${cve.status || "N/A"}</td>
+            `;
+          cveTableBody.appendChild(row);
+        });
+      }
+
+      // Show CVE details in modal by fetching data
+      async function showCveDetails(cveId) {
+        try {
+          const response = await fetch(
+            `http://localhost:5000/cves/list?cve_id=${cveId}`
+          );
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          const data = await response.json();
+          if (data && data.data && data.data.length > 0) {
+            const cve = data.data[0]; // Assuming the first result is the correct one
+            document.getElementById("modal-cve-id").textContent = cve.cve_id;
+            document.getElementById("modal-published").textContent =
+              cve.published;
+            document.getElementById("modal-last-modified").textContent =
+              cve.last_modified;
+            document.getElementById("modal-identifier").textContent =
+              cve.source_identifier || "N/A";
+            document.getElementById("modal-status").textContent =
+              cve.status || "N/A";
+            document.getElementById("modal-description").textContent =
+              cve.description || "No description available.";
+            document.getElementById("modal-cvss").textContent =
+              cve.cvss_v2_score || "N/A";
+            document.getElementById("modal-vulnerability-type").textContent =
+              cve.cvss_v2_severity || "N/A";
+            document.getElementById("modal-impact").textContent =
+              cve.cvss_v2_vector || "N/A";
+            document.getElementById("modal-references").textContent =
+              cve.cvss_v31_score || "N/A";
+            document.getElementById("modal-severity").textContent =
+              cve.cvss_v31_severity || "N/A";
+            document.getElementById("modal-affected-software").textContent =
+              cve.cvss_v31_vector || "N/A";
+          }
+        } catch (error) {
+          console.error("Error fetching CVE details:", error);
+        }
+      }
+
+      // Update pagination buttons
+      function updatePaginationButtons(
+        currentPage,
+        totalRecords,
+        resultsPerPage
+      ) {
+        const totalPages = Math.ceil(totalRecords / resultsPerPage);
+        prevPageBtn.disabled = currentPage === 0;
+        nextPageBtn.disabled = currentPage === totalPages - 1;
+      }
+
+      // Event listeners for pagination
+      prevPageBtn.addEventListener("click", () => {
+        if (currentPage > 0) {
+          currentPage--;
+          fetchData();
+        }
+      });
+
+      nextPageBtn.addEventListener("click", () => {
+        currentPage++;
+        fetchData();
+      });
+
+      // Event listener for results per page
+      document
+        .getElementById("results-per-page")
+        .addEventListener("change", (event) => {
+          resultsPerPage = parseInt(event.target.value, 10);
+          currentPage = 0; // Reset to first page
+          fetchData();
+        });
+
+      // Event listeners for filters
+      document.getElementById("cve-id-filter").addEventListener("input", () => {
+        currentPage = 0; // Reset to first page on filter change
+        fetchData();
+      });
+
+      document.getElementById("year-filter").addEventListener("input", () => {
+        currentPage = 0; // Reset to first page on filter change
+        fetchData();
+      });
+
+      document.getElementById("score-filter").addEventListener("input", () => {
+        currentPage = 0; // Reset to first page on filter change
+        fetchData();
+      });
+
+      document.getElementById("days-filter").addEventListener("input", () => {
+        currentPage = 0; // Reset to first page on filter change
+        fetchData();
+      });
+
+      // Initialize by fetching data
+      fetchData();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CVE Dashboard</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        background-color: #f8f9fa;
+      }
+      .table-container {
+        margin-top: 30px;
+      }
+      .pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .details-container {
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header class="my-4">
+        <h1 class="text-center">CVE Vulnerability Dashboard</h1>
+      </header>
+
+      <!-- CVE List Section -->
+      <section class="table-container">
+        <h3>All CVE Records</h3>
+        <div class="pagination-container">
+          <span>Total Records: <span id="total-records">0</span></span>
+          <select id="results-per-page" class="form-select w-auto">
+            <option value="10">10</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+        <table class="table table-bordered table-hover mt-3">
+          <thead class="table-light">
+            <tr>
+              <th scope="col">CVE ID</th>
+              <th scope="col">Published</th>
+              <th scope="col">Last Modified</th>
+              <th scope="col">Identifier</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody id="cve-table-body">
+            <tr>
+              <td colspan="9" class="text-center">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="d-flex justify-content-between">
+          <button id="prev-page" class="btn btn-outline-primary" disabled>
+            Previous
+          </button>
+          <button id="next-page" class="btn btn-outline-primary" disabled>
+            Next
+          </button>
+        </div>
+      </section>
+
+      <!-- CVE Details Section -->
+      <section
+        id="cve-detail-section"
+        class="details-container"
+        style="display: none"
+      >
+        <h3>CVE Details</h3>
+        <div class="card">
+          <div class="card-body">
+            <p><strong>CVE ID:</strong> <span id="detail-cve-id"></span></p>
+            <p>
+              <strong>Published:</strong> <span id="detail-published"></span>
+            </p>
+            <p>
+              <strong>Last Modified:</strong>
+              <span id="detail-last-modified"></span>
+            </p>
+            <p>
+              <strong>Description:</strong>
+              <span id="detail-description"></span>
+            </p>
+            <p>
+              <strong>CVSS v3 Score:</strong>
+              <span id="detail-cvss-score"></span>
+            </p>
+            <p>
+              <strong>CVSS v3 Severity:</strong>
+              <span id="detail-cvss-v3-severity"></span>
+            </p>
+            <p>
+              <strong>CVSS v3 Vector:</strong>
+              <span id="detail-cvss-v3-vector"></span>
+            </p>
+            <p>
+              <strong>CVSS v2 Score:</strong>
+              <span id="detail-cvss-v2-score"></span>
+            </p>
+            <p>
+              <strong>CVSS v2 Severity:</strong>
+              <span id="detail-cvss-v2-severity"></span>
+            </p>
+            <p>
+              <strong>CVSS v2 Vector:</strong>
+              <span id="detail-cvss-v2-vector"></span>
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      let currentPage = 0;
+      const resultsPerPageEl = document.getElementById("results-per-page");
+      const totalRecordsEl = document.getElementById("total-records");
+      const cveTableBody = document.getElementById("cve-table-body");
+      const prevPageBtn = document.getElementById("prev-page");
+      const nextPageBtn = document.getElementById("next-page");
+
+      async function fetchData(limit, offset) {
+        try {
+          const response = await fetch(
+            `http://localhost:5000/cves/list?limit=${limit}&offset=${offset}`
+          );
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          const data = await response.json();
+          populateTable(data.data);
+          totalRecordsEl.textContent = data.total;
+          updatePaginationButtons(offset, data.total, limit);
+        } catch (error) {
+          console.error("Error fetching data:", error);
+          cveTableBody.innerHTML = `<tr><td colspan="9" class="text-danger text-center">Failed to load data</td></tr>`;
+        }
+      }
+
+      function populateTable(cves) {
+        cveTableBody.innerHTML = "";
+        cves.forEach((cve) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td><a href="#" class="cve-link" data-id="${cve.cve_id}">${
+            cve.cve_id
+          }</a></td>
+            <td>${cve.published}</td>
+            <td>${cve.last_modified}</td>
+            <td>${cve.source_identifier || "N/A"}</td>
+            <td>${cve.status || "N/A"}</td>
+          `;
+          cveTableBody.appendChild(row);
+        });
+
+        document.querySelectorAll(".cve-link").forEach((link) => {
+          link.addEventListener("click", (e) => {
+            e.preventDefault();
+            fetchCveDetails(e.target.dataset.id);
+          });
+        });
+      }
+
+      async function fetchCveDetails(cveId) {
+        const response = await fetch(
+          `http://localhost:5000/cves/list?cve_id=${cveId}`
+        );
+        const data = await response.json();
+        const cve = data.data[0];
+        displayCveDetails(cve);
+      }
+
+      function displayCveDetails(cve) {
+        document.getElementById("detail-cve-id").textContent = cve.cve_id;
+        document.getElementById("detail-published").textContent = cve.published;
+        document.getElementById("detail-last-modified").textContent =
+          cve.last_modified;
+        document.getElementById("detail-description").textContent =
+          cve.description;
+        document.getElementById("detail-cvss-score").textContent =
+          cve.cvss_v31_score || "N/A";
+        document.getElementById("detail-cvss-v3-severity").textContent =
+          cve.cvss_v31_severity || "N/A";
+        document.getElementById("detail-cvss-v3-vector").textContent =
+          cve.cvss_v31_vector || "N/A";
+        document.getElementById("detail-cvss-v2-score").textContent =
+          cve.cvss_v2_score || "N/A";
+        document.getElementById("detail-cvss-v2-severity").textContent =
+          cve.cvss_v2_severity || "N/A";
+        document.getElementById("detail-cvss-v2-vector").textContent =
+          cve.cvss_v2_vector || "N/A";
+
+        document.getElementById("cve-detail-section").style.display = "block";
+      }
+
+      function updatePaginationButtons(offset, total, limit) {
+        prevPageBtn.disabled = offset === 0;
+        nextPageBtn.disabled = offset + limit >= total;
+      }
+
+      resultsPerPageEl.addEventListener("change", () => {
+        currentPage = 0;
+        fetchData(resultsPerPageEl.value, 0);
+      });
+
+      prevPageBtn.addEventListener("click", () => {
+        if (currentPage > 0) currentPage -= 1;
+        fetchData(resultsPerPageEl.value, currentPage * resultsPerPageEl.value);
+      });
+
+      nextPageBtn.addEventListener("click", () => {
+        currentPage += 1;
+        fetchData(resultsPerPageEl.value, currentPage * resultsPerPageEl.value);
+      });
+
+      fetchData(10, 0); // Initial load
+    </script>
+  </body>
+</html>
