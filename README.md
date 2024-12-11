@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # CVE Vulnerability Dashboard
 
 ## Overview
@@ -23,3 +24,6 @@ This project uses basic web technologies (HTML, CSS, JavaScript) and requires no
 - **CORS**: Since the app.py runs the flask in 5000 port number and html page runs in a different port, I couldn't connect those two until I used CORS
 - **Filters**: In the frontend side of things I had to figure out how to work out the design and the filter system which took a lot of time.
 - **Total Records**: To get the total records from the nvd api was also really challenging because the data is huge and getting through timeouts every now and then while the fetch_data.py was very challenging and time consuming as well
+=======
+# cve_api_project
+>>>>>>> 900d55959f39249f91b285d80a13e48f5ef2d47f
